@@ -33,7 +33,8 @@ static bool ShouldWindowClose = false;
 static bool Reset = true;
 static bool AdvanceByOne = false;
 static bool Paused = true;
-static u32 WindowWidth = 1280, WindowHeight = 720;
+static u32 WindowWidth = 1024, WindowHeight = 1024;
+static u32 TextureSize = 256;
 
 static s32 MousePositionX = -1024, MousePositionY = -1024;
 bool MouseDown;
@@ -205,7 +206,8 @@ RWTexture CreateRWTexture(ID3D11Device *Device, DXGI_FORMAT Format, u32 Width, u
 typedef struct {
     u32 Row;
     f32 Time;
-    u64 _Padding1;
+    s32 TextureSize;
+    u32 _Padding;
 } constant_buffer;
 
 [[noreturn]]
@@ -264,7 +266,7 @@ void AppMain() {
         u32 AdjustedHeight = WindowSize.bottom - WindowSize.top;
 
         WindowHandle = CreateWindowExW(
-            ExStyle, WindowClass.lpszClassName, L"D3D11Window", Style,
+            ExStyle, WindowClass.lpszClassName, L"Edge Of Chaos", Style,
             CW_USEDEFAULT, CW_USEDEFAULT, AdjustedWidth, AdjustedHeight,
             NULL, NULL, hInstance, NULL
         );
@@ -400,7 +402,7 @@ void AppMain() {
         Assert(SUCCEEDED(HR));
     }
 
-    RWTexture Texture = CreateRWTexture(Device, DXGI_FORMAT_R32_FLOAT, WindowWidth, WindowHeight);
+    RWTexture Texture = CreateRWTexture(Device, DXGI_FORMAT_R32_FLOAT, TextureSize, TextureSize);
 
     ID3D11SamplerState *SamplerState;
     {
@@ -464,10 +466,6 @@ void AppMain() {
     ID3D11DepthStencilView *DepthStencilView = 0;
 
     {
-        RECT Rect;
-        GetClientRect(WindowHandle, &Rect);
-        WindowWidth = Rect.right - Rect.left;
-        WindowHeight = Rect.bottom - Rect.top;
         // HR = IDXGISwapChain1_ResizeBuffers(SwapChain, 0, WindowWidth, WindowHeight, DXGI_FORMAT_UNKNOWN, 0);
         // Assert(SUCCEEDED(HR));
         ID3D11Texture2D *BackBuffer = 0;
@@ -476,8 +474,8 @@ void AppMain() {
         ID3D11Texture2D_Release(BackBuffer);
 
         D3D11_TEXTURE2D_DESC DepthDesc = {
-            .Width = WindowWidth,
-            .Height = WindowHeight,
+            .Width = TextureSize,
+            .Height = TextureSize,
             .MipLevels = 1,
             .ArraySize = 1,
             .Format = DXGI_FORMAT_D32_FLOAT, // or use DXGI_FORMAT_D32_FLOAT_S8X24_UINT if you need stencil
@@ -518,6 +516,7 @@ void AppMain() {
 
         static constant_buffer Constants = {0};
         Constants.Time = Time;
+        Constants.TextureSize = TextureSize;
         if (Reset) Constants.Row = 1;
 
         WriteToConstantBuffer(DeviceContext, ConstantBuffer, BufferFromStruct(Constants));
@@ -526,14 +525,14 @@ void AppMain() {
             ID3D11DeviceContext_ClearUnorderedAccessViewFloat(DeviceContext, Texture.UAV, Clear);
             static compute_shader ResetCS = {0};
             GetComputeShader(Device, "reset.compute.cso", &ResetCS);
-            DispatchKernel(DeviceContext, ResetCS, WindowWidth / 128, 1, &Texture.UAV, 1, ConstantBuffer);
+            DispatchKernel(DeviceContext, ResetCS, TextureSize / 128, 1, &Texture.UAV, 1, ConstantBuffer);
             Reset = false;
         }
 
         if ((!Paused && Constants.Row < WindowHeight) || (Paused && AdvanceByOne)) {
             static compute_shader ResetCS = {0};
             GetComputeShader(Device, "advance.compute.cso", &ResetCS);
-            DispatchKernel(DeviceContext, ResetCS, WindowWidth / 128, 1, &Texture.UAV, 1, ConstantBuffer);
+            DispatchKernel(DeviceContext, ResetCS, TextureSize / 128, 1, &Texture.UAV, 1, ConstantBuffer);
             Constants.Row += 1;
             AdvanceByOne = false;
         }
@@ -638,13 +637,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_LBUTTONUP: {
             MouseDown = uMsg == WM_LBUTTONDOWN;
             // MouseDown = true;
-            MousePositionX = (GET_X_LPARAM(lParam) / (float)WindowWidth) * 1024.0f;
-            MousePositionY = 1024 - ((GET_Y_LPARAM(lParam) / (float)WindowHeight) * 1024.0f);
+            MousePositionX = (GET_X_LPARAM(lParam) / (float)WindowWidth) * TextureSize;
+            MousePositionY = TextureSize - ((GET_Y_LPARAM(lParam) / (float)WindowHeight) * TextureSize);
             return 0;
         }
         case WM_MOUSEMOVE: {
-            MousePositionX = (GET_X_LPARAM(lParam) / (float)WindowWidth) * 1024.0f;
-            MousePositionY = 1024 - ((GET_Y_LPARAM(lParam) / (float)WindowHeight) * 1024.0f);
+            MousePositionX = (GET_X_LPARAM(lParam) / (float)WindowWidth) * TextureSize;
+            MousePositionY = TextureSize - ((GET_Y_LPARAM(lParam) / (float)WindowHeight) * TextureSize);
             return 0;
         }
         case WM_KEYDOWN: {
