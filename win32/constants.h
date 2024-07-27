@@ -1,0 +1,1 @@
+#define CA_STATES 2
