@@ -12,6 +12,8 @@
 #include <d3dcompiler.h>
 #include <dxgidebug.h>
 
+#include "constants.h"
+
 #define GET_X_LPARAM(lp)                        ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp)                        ((int)(short)HIWORD(lp))
 
@@ -202,9 +204,6 @@ RWTexture CreateRWTexture(ID3D11Device *Device, DXGI_FORMAT Format, u32 Width, u
 
     return Result;
 }
-
-#include <stdalign.h>
-
 
 typedef struct {
     u32 Row;
@@ -543,17 +542,13 @@ void AppMain() {
             Time = TimeElapsed / (f64)PerformanceFrequency.QuadPart;
         }
 
-        for (u32 i = 0; i < 29; ++i) {
-            F32_Random(&RandomState);
-        }
-
         static constant_buffer Constants = {0};
         Constants.Time = Time;
         Constants.TextureSize = TextureSize;
         if (Reset) {
             Constants.Row = 1;
             for (u32 i = 0; i < ArrayLength(Constants.LookupTable); ++i) {
-                Constants.LookupTable[i] = F32_Random(&RandomState) > 0.5f ? 0x1 : 0x0;
+                Constants.LookupTable[i] = (u32)(F32_Random(&RandomState) * STATES);
             }
         }
 

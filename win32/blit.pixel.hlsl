@@ -13,19 +13,24 @@ float4 RGB(float R, float G, float B) {
 
 float4 main(float2 uv : TexCoord) : SV_Target {
     float textureSample = tex.Sample(textureSampler, uv).r;
-
-    float inc = 1.0 / 1024.0;
-    float textureSample1 = tex.Sample(textureSampler, uv + float2(inc, 0.0)).r;
-    float textureSample2 = tex.Sample(textureSampler, uv + float2(-inc, 0.0)).r;
-    float textureSample3 = tex.Sample(textureSampler, uv + float2(0.0, inc)).r;
-    float textureSample4 = tex.Sample(textureSampler, uv + float2(0.0, -inc)).r;
-
-    float neighbors =
-        textureSample1 * 0.25 +
-        textureSample2 * 0.25 +
-        textureSample3 * 0.25 +
-        textureSample4 * 0.25;
-    float result = textureSample * 0.6 + neighbors * 0.4;
-    float4 output = lerp(RGB(192, 192, 192), RGB(10 * 2, 10 * 2, 10 * 2), smoothstep(0.375, 0.0, result));
-    return output;
+    float4 result = 0.0f;
+    switch (textureSample) {
+        case 0.0: {
+            result = RGB(0.0, 0.0, 0.0);
+            break;
+        }
+        case 1.0: {
+            result = RGB(0.0, 255.0, 0.0);
+            break;
+        }
+        case 2.0: {
+            result = RGB(0.0, 0.0, 255.0);
+            break;
+        }
+        case 3.0: {
+            result = RGB(255.0, 255.0, 255.0);
+            break;
+        }
+    }
+    return result;
 }

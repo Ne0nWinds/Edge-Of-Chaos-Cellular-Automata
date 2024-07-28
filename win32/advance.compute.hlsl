@@ -21,9 +21,9 @@ void main(uint3 id : SV_DispatchThreadID) {
     const int search_range = SEARCH_RANGE;
 
     uint index = 0;
-    index += (AccessTexture(id.x - 1, Row - 1)) == 0.0 ? 4 : 0;
-    index += (AccessTexture(id.x + 0, Row - 1)) == 0.0 ? 2 : 0;
-    index += (AccessTexture(id.x + 1, Row - 1)) == 0.0 ? 1 : 0;
+    index += (AccessTexture(id.x - 1, Row - 1)) * 16;
+    index += (AccessTexture(id.x + 0, Row - 1)) * 4;
+    index += (AccessTexture(id.x + 1, Row - 1));
 
     float final_state = LookupTable[index];
     texture1[float2(id.x, Row)] = final_state;

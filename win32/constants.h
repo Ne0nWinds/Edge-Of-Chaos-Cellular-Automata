@@ -1,4 +1,4 @@
-#define STATES 2
+#define STATES 4
 #define SEARCH_RANGE 1
 #define NEIGHBORHOOD_RANGE (SEARCH_RANGE * 2 + 1)
-#define STATE_COMBOS 8
+// #define STATE_COMBOS 8
