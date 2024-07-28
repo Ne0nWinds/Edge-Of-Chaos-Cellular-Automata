@@ -203,12 +203,41 @@ RWTexture CreateRWTexture(ID3D11Device *Device, DXGI_FORMAT Format, u32 Width, u
     return Result;
 }
 
+#include <stdalign.h>
+
+
 typedef struct {
     u32 Row;
     f32 Time;
     s32 TextureSize;
-    u32 _Padding;
-} constant_buffer;
+    u32 LookupTable[64];
+} __attribute__((aligned(16))) constant_buffer;
+
+typedef struct {
+    u64 Seed;
+} u64_random_state;
+
+static u32 U32_Random(u64_random_state *State) {
+        u64 OldSeed = State->Seed;
+#if 1
+        State->Seed = OldSeed * 6364136223846793005ULL + 1442695040888963407ULL;
+#else
+        Seed = Seed * 6364136223846793005ULL;
+#endif
+        u32 Result = RotateRight32((u32)(OldSeed >> 32) ^ (u32)OldSeed, OldSeed >> 59);
+        return Result;
+
+}
+
+static f32 F32_Random(u64_random_state *State) {
+    u32 RandomInt = U32_Random(State);
+    f64 MaxInt = (u32)-1;
+    return (f64)RandomInt / MaxInt;
+}
+
+static u64_random_state RandomState = {
+    0x55814718A1D6AE6ALLU
+};
 
 [[noreturn]]
 void AppMain() {
@@ -514,10 +543,19 @@ void AppMain() {
             Time = TimeElapsed / (f64)PerformanceFrequency.QuadPart;
         }
 
+        for (u32 i = 0; i < 29; ++i) {
+            F32_Random(&RandomState);
+        }
+
         static constant_buffer Constants = {0};
         Constants.Time = Time;
         Constants.TextureSize = TextureSize;
-        if (Reset) Constants.Row = 1;
+        if (Reset) {
+            Constants.Row = 1;
+            for (u32 i = 0; i < ArrayLength(Constants.LookupTable); ++i) {
+                Constants.LookupTable[i] = F32_Random(&RandomState) > 0.5f ? 0x1 : 0x0;
+            }
+        }
 
         WriteToConstantBuffer(DeviceContext, ConstantBuffer, BufferFromStruct(Constants));
         if (Reset) {
@@ -593,7 +631,7 @@ void AppMain() {
 
         ID3D11DeviceContext_Draw(DeviceContext, 6, 0);
 
-        IDXGISwapChain1_Present(SwapChain, 2, 0);
+        IDXGISwapChain1_Present(SwapChain, 1, 0);
         ID3D11DeviceContext_PSSetShaderResources(DeviceContext, 0, 1, (ID3D11ShaderResourceView**)NullSRV);
     }
 

@@ -1,4 +1,6 @@
 
+#include "constants.h"
+
 cbuffer Constants {
     uint Row;
     float Time;
@@ -12,7 +14,7 @@ float random(float n) {
 
 [numthreads(128,1,1)]
 void main(uint3 id : SV_DispatchThreadID) {
-    const uint states = 2.0;
+    const uint states = STATES;
 
     float2 index = float2(id.x, 0);
     texture1[index] = floor(random(id.x) * states);
