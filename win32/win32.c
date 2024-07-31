@@ -553,7 +553,7 @@ void AppMain() {
         if (Reset) {
             Constants.Row = 1;
             Constants.RandomSeed = F32_Random(&RandomState);
-            const float Lambda = 0.5f;
+            const float Lambda = 0.25f;
             u32 i = 0;
             for (; i < STATE_COMBOS * Lambda; ++i) {
                 u32 RandomValue = (u32)(F32_Random(&RandomState) * (STATES - 1)) + 1;

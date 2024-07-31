@@ -25,7 +25,7 @@ void main(uint3 id : SV_DispatchThreadID) {
     uint index = 0;
     int multiplier = STATE_COMBOS / states;
     for (int i = -search_range; i <= search_range; ++i) {
-        index += AccessTexture(id.x - i, Row - 1) * multiplier;
+        index += AccessTexture((int)id.x - i, Row - 1) * multiplier;
         multiplier /= states;
     }
 
