@@ -132,7 +132,10 @@ void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *ComputeS
     memory_arena FileArena = ArenaScratch(&TempArena);
 
     HANDLE FileHandle = CreateFileA(Path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    Assert(FileHandle != INVALID_HANDLE_VALUE);
+    // Assert(FileHandle != INVALID_HANDLE_VALUE);
+    if (FileHandle == INVALID_HANDLE_VALUE) {
+        return;
+    }
 
     FILETIME LastWriteTime = {0};
     GetFileTime(FileHandle, NULL, NULL, &LastWriteTime);
@@ -158,6 +161,11 @@ void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *ComputeS
             .Data = Buffer,
             .Size = FileSize.LowPart
         };
+    }
+
+    if (ComputeShader->D3D11ComputeShaderHandle != 0) {
+        ID3D11ComputeShader_Release(ComputeShader->D3D11ComputeShaderHandle);
+        OutputDebugStringA("Reloading Compute Shader!\n");
     }
     ID3D11Device_CreateComputeShader(Device, ByteCode.Data, ByteCode.Size, NULL, &Result.D3D11ComputeShaderHandle);
     Assert(Result.D3D11ComputeShaderHandle != 0);
@@ -216,7 +224,7 @@ typedef struct {
     u32 Row;
     f32 Time;
     s32 TextureSize;
-    u32 _Padding;
+    f32 RandomSeed;
     padded_u32 LookupTable[8];
 } constant_buffer;
 
@@ -554,6 +562,7 @@ void AppMain() {
         Constants.TextureSize = TextureSize;
         if (Reset) {
             Constants.Row = 1;
+            Constants.RandomSeed = F32_Random(&RandomState);
             const float Lambda = 4.0f / 8.0f;
             u32 i = 0;
             for (; i < STATE_COMBOS * Lambda; ++i) {

@@ -4,6 +4,7 @@ cbuffer Constants {
     uint Row;
     float Time;
     int TextureSize;
+    float RandomSeed;
     uint LookupTable[8];
 };
 

@@ -4,12 +4,14 @@
 cbuffer Constants {
     uint Row;
     float Time;
+    int TextureSize;
+    float RandomSeed;
 };
 
 RWTexture2D<float> texture1 : register(u0);
 
 float random(float n) {
-    return frac(cos(n * 1789.69283897 + Time) * 5781.3912490889914);
+    return frac(cos(n * 1789.69283897519486 + RandomSeed * 6.283185307179586) * 5781.3912490889914);
 }
 
 [numthreads(128,1,1)]
