@@ -20,7 +20,7 @@ float4 main(float2 uv : TexCoord) : SV_Target {
             break;
         }
         case 1.0: {
-            result = RGB(0.0, 255.0, 0.0);
+            result = RGB(255.0, 255.0, 255.0);
             break;
         }
         case 2.0: {
@@ -28,7 +28,7 @@ float4 main(float2 uv : TexCoord) : SV_Target {
             break;
         }
         case 3.0: {
-            result = RGB(255.0, 255.0, 255.0);
+            result = RGB(0.0, 255.0, 0.0);
             break;
         }
     }

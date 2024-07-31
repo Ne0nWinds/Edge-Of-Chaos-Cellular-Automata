@@ -8,7 +8,7 @@ void * __cdecl memset(void* dst, int ch, unsigned long long count) {
 	return dst;
 }
 
-void * __cdecl memcpy(void *dst, const void *src, unsigned long long count) {
+void * __cdecl memcpy(void * restrict dst, const void * restrict src, unsigned long long count) {
 	unsigned char *d = (unsigned char *)dst;
 	const unsigned char *s = (const unsigned char *)src;
 

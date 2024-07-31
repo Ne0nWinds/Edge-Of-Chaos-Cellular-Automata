@@ -34,7 +34,7 @@ static HWND WindowHandle;
 static bool ShouldWindowClose = false;
 static bool Reset = true;
 static bool AdvanceByOne = false;
-static bool Paused = true;
+static bool Paused = false;
 static u32 WindowWidth = 1024, WindowHeight = 1024;
 static u32 TextureSize = 256;
 
@@ -60,7 +60,7 @@ typedef struct {
 	u64 Size;
 } buffer;
 
-#define BufferFromStruct(s) ((buffer){ .Data = &s, .Size = sizeof(s) })
+#define BufferFromStruct(s) ((buffer){ .Data = (void *)&s, .Size = sizeof(s) })
 
 static buffer FileRead(memory_arena *Arena, const char *Path) {
     HANDLE FileHandle = CreateFileA(Path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -121,7 +121,7 @@ void DispatchKernel(ID3D11DeviceContext *DeviceContext, compute_shader ComputeSh
 }
 
 void WriteToConstantBuffer(ID3D11DeviceContext *DeviceContext, ID3D11Buffer *ConstantBuffer, buffer ConstantBufferData) {
-    D3D11_MAPPED_SUBRESOURCE Resource = { };
+    D3D11_MAPPED_SUBRESOURCE Resource = {0};
     ID3D11DeviceContext_Map(DeviceContext, (ID3D11Resource*)ConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &Resource);
     memcpy(Resource.pData, ConstantBufferData.Data, ConstantBufferData.Size);
     ID3D11DeviceContext_Unmap(DeviceContext, (ID3D11Resource*)ConstantBuffer, 0);
@@ -205,12 +205,20 @@ RWTexture CreateRWTexture(ID3D11Device *Device, DXGI_FORMAT Format, u32 Width, u
     return Result;
 }
 
+#include <stdalign.h>
+
+typedef struct {
+    u32 Value;
+    u32 Padding[3];
+} padded_u32;
+
 typedef struct {
     u32 Row;
     f32 Time;
     s32 TextureSize;
-    u32 LookupTable[64];
-} __attribute__((aligned(16))) constant_buffer;
+    u32 _Padding;
+    padded_u32 LookupTable[8];
+} constant_buffer;
 
 typedef struct {
     u64 Seed;
@@ -531,7 +539,6 @@ void AppMain() {
     PreviousWindowWidth = WindowWidth;
     PreviousWindowHeight = WindowHeight;
 
-
     while (!WindowShouldClose()) {
         
         static f64 Time = 0.0;
@@ -547,8 +554,20 @@ void AppMain() {
         Constants.TextureSize = TextureSize;
         if (Reset) {
             Constants.Row = 1;
-            for (u32 i = 0; i < ArrayLength(Constants.LookupTable); ++i) {
-                Constants.LookupTable[i] = (u32)(F32_Random(&RandomState) * STATES);
+            const float Lambda = 4.0f / 8.0f;
+            u32 i = 0;
+            for (; i < STATE_COMBOS * Lambda; ++i) {
+                u32 RandomValue = (u32)(F32_Random(&RandomState) * (STATES - 1)) + 1;
+                Constants.LookupTable[i].Value = RandomValue;
+            }
+            for (; i < STATE_COMBOS; ++i) {
+                Constants.LookupTable[i].Value = 0;
+            }
+            for (u32 j = 0; j < STATE_COMBOS; ++j) {
+                u32 RandomIndex = (u32)(F32_Random(&RandomState) * STATE_COMBOS);
+                u32 Temp = Constants.LookupTable[j].Value;
+                Constants.LookupTable[j] = Constants.LookupTable[RandomIndex];
+                Constants.LookupTable[RandomIndex].Value = Temp;
             }
         }
 
@@ -562,12 +581,16 @@ void AppMain() {
             Reset = false;
         }
 
-        if ((!Paused && Constants.Row < WindowHeight) || (Paused && AdvanceByOne)) {
+        if ((!Paused && Constants.Row < TextureSize) || (Paused && AdvanceByOne)) {
             static compute_shader ResetCS = {0};
             GetComputeShader(Device, "advance.compute.cso", &ResetCS);
             DispatchKernel(DeviceContext, ResetCS, TextureSize / 128, 1, &Texture.UAV, 1, ConstantBuffer);
             Constants.Row += 1;
             AdvanceByOne = false;
+        }
+
+        if (Constants.Row == TextureSize && !Paused) {
+            Reset = true;
         }
 
         if (PreviousWindowWidth != WindowWidth || PreviousWindowHeight != WindowHeight) {
