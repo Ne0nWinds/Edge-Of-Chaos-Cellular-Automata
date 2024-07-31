@@ -1,3 +1,4 @@
+#include "constants.h"
 
 Texture2D tex;
 SamplerState textureSampler;
@@ -11,26 +12,10 @@ float4 RGB(float R, float G, float B) {
     );
 }
 
+float4 ColorArray[4];
+
 float4 main(float2 uv : TexCoord) : SV_Target {
     float textureSample = tex.Sample(textureSampler, uv).r;
-    float4 result = 0.0f;
-    switch (textureSample) {
-        case 0.0: {
-            result = RGB(0.0, 0.0, 0.0);
-            break;
-        }
-        case 1.0: {
-            result = RGB(255.0, 255.0, 255.0);
-            break;
-        }
-        case 2.0: {
-            result = RGB(0.0, 0.0, 255.0);
-            break;
-        }
-        case 3.0: {
-            result = RGB(0.0, 255.0, 0.0);
-            break;
-        }
-    }
+    float4 result = textureSample / (STATES - 1);
     return result;
 }

@@ -237,8 +237,8 @@ static u32 U32_Random(u64_random_state *State) {
 
 static f32 F32_Random(u64_random_state *State) {
     u32 RandomInt = U32_Random(State);
-    f64 MaxInt = (u32)-1;
-    return (f64)RandomInt / MaxInt;
+    f64 MaxInt = 1.0 / (u32)-1;
+    return (f64)RandomInt * MaxInt;
 }
 
 static u64_random_state RandomState = {
