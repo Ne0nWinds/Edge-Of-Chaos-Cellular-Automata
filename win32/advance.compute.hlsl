@@ -5,7 +5,7 @@ cbuffer Constants {
     float Time;
     int TextureSize;
     float RandomSeed;
-    uint LookupTable[8];
+    uint LookupTable[STATE_COMBOS];
 };
 
 RWTexture2D<float> texture1 : register(u0);
@@ -23,14 +23,11 @@ void main(uint3 id : SV_DispatchThreadID) {
     const int search_range = SEARCH_RANGE;
 
     uint index = 0;
-    // int multiplier = STATE_COMBOS / states;
-    // for (int i = -search_range; i < search_range; ++i) {
-    //     index += AccessTexture(id.x - i, Row - 1) * multiplier;
-    //     multiplier /= states;
-    // }
-    index += (AccessTexture(id.x - 1, Row - 1)) == 0 ? 0 : 4;
-    index += (AccessTexture(id.x + 0, Row - 1)) == 0 ? 0 : 2;
-    index += (AccessTexture(id.x + 1, Row - 1)) == 0 ? 0 : 1;
+    int multiplier = STATE_COMBOS / states;
+    for (int i = -search_range; i <= search_range; ++i) {
+        index += AccessTexture(id.x - i, Row - 1) * multiplier;
+        multiplier /= states;
+    }
 
     float final_state = LookupTable[index];
     texture1[float2(id.x, Row)] = final_state;

@@ -103,7 +103,7 @@ typedef struct {
     FILETIME FileTime;
 } compute_shader;
 
-void DispatchKernel(ID3D11DeviceContext *DeviceContext, compute_shader ComputeShader, u32 DispatchX, u32 DispatchY, ID3D11UnorderedAccessView **UAVs, u32 UAVCount, ID3D11Buffer *ConstantBuffer) {
+static void DispatchKernel(ID3D11DeviceContext *DeviceContext, compute_shader ComputeShader, u32 DispatchX, u32 DispatchY, ID3D11UnorderedAccessView **UAVs, u32 UAVCount, ID3D11Buffer *ConstantBuffer) {
     static ID3D11UnorderedAccessView *NullUAV[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
     ID3D11DeviceContext_CSSetShader(DeviceContext, ComputeShader.D3D11ComputeShaderHandle, NULL, 0);
     if (UAVs) {
@@ -120,20 +120,25 @@ void DispatchKernel(ID3D11DeviceContext *DeviceContext, compute_shader ComputeSh
     ID3D11DeviceContext_CSSetShader(DeviceContext, NullCS, NULL, 0);
 }
 
-void WriteToConstantBuffer(ID3D11DeviceContext *DeviceContext, ID3D11Buffer *ConstantBuffer, buffer ConstantBufferData) {
+static void WriteToConstantBuffer(ID3D11DeviceContext *DeviceContext, ID3D11Buffer *ConstantBuffer, buffer ConstantBufferData) {
     D3D11_MAPPED_SUBRESOURCE Resource = {0};
     ID3D11DeviceContext_Map(DeviceContext, (ID3D11Resource*)ConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &Resource);
     memcpy(Resource.pData, ConstantBufferData.Data, ConstantBufferData.Size);
     ID3D11DeviceContext_Unmap(DeviceContext, (ID3D11Resource*)ConstantBuffer, 0);
 }
 
-void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *ComputeShader) {
+static void UnbindConstantBuffer(ID3D11DeviceContext *DeviceContext) {
+    ID3D11Buffer *NullConstantBuffer = 0;
+    ID3D11DeviceContext_CSSetConstantBuffers(DeviceContext, 0, 1, &NullConstantBuffer);
+}
+
+static void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *ComputeShader) {
     compute_shader Result = {0};
     memory_arena FileArena = ArenaScratch(&TempArena);
 
     HANDLE FileHandle = CreateFileA(Path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    // Assert(FileHandle != INVALID_HANDLE_VALUE);
     if (FileHandle == INVALID_HANDLE_VALUE) {
+        Assert(ComputeShader->D3D11ComputeShaderHandle != 0); // Invalid File Path
         return;
     }
 
@@ -173,15 +178,6 @@ void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *ComputeS
     CloseHandle(FileHandle);
     *ComputeShader = Result;
 }
-
-// typedef struct {
-//     ID3D11VertexShader *VertexShader;
-//     ID3D11PixelShader *PixelShader;
-// } rasterization_shaders;
-// 
-// void Get(ID3D11Device *Device, char *Path, rasterization_shaders *Shaders) {
-// 
-// }
 
 typedef struct {
     ID3D11Texture2D *Texture;
@@ -225,7 +221,7 @@ typedef struct {
     f32 Time;
     s32 TextureSize;
     f32 RandomSeed;
-    padded_u32 LookupTable[8];
+    padded_u32 LookupTable[STATE_COMBOS];
 } constant_buffer;
 
 typedef struct {
@@ -233,15 +229,10 @@ typedef struct {
 } u64_random_state;
 
 static u32 U32_Random(u64_random_state *State) {
-        u64 OldSeed = State->Seed;
-#if 1
-        State->Seed = OldSeed * 6364136223846793005ULL + 1442695040888963407ULL;
-#else
-        Seed = Seed * 6364136223846793005ULL;
-#endif
-        u32 Result = RotateRight32((u32)(OldSeed >> 32) ^ (u32)OldSeed, OldSeed >> 59);
-        return Result;
-
+    u64 OldSeed = State->Seed;
+    State->Seed = OldSeed * 6364136223846793005ULL + 1442695040888963407ULL;
+    u32 Result = RotateRight32((u32)(OldSeed >> 32) ^ (u32)OldSeed, OldSeed >> 59);
+    return Result;
 }
 
 static f32 F32_Random(u64_random_state *State) {
@@ -431,7 +422,6 @@ void AppMain() {
         ID3D11Device_CreateInputLayout(Device, Description, ARRAYSIZE(Description), VertexShaderByteCode.Data, VertexShaderByteCode.Size, &Layout);
     }
 
-    ID3D11Buffer *NullConstantBuffer = 0;
     ID3D11Buffer *ConstantBuffer = 0;
     {
         D3D11_BUFFER_DESC BufferDescription = {
@@ -563,7 +553,7 @@ void AppMain() {
         if (Reset) {
             Constants.Row = 1;
             Constants.RandomSeed = F32_Random(&RandomState);
-            const float Lambda = 4.0f / 8.0f;
+            const float Lambda = 0.5f;
             u32 i = 0;
             for (; i < STATE_COMBOS * Lambda; ++i) {
                 u32 RandomValue = (u32)(F32_Random(&RandomState) * (STATES - 1)) + 1;
