@@ -33,8 +33,12 @@ static memory_arena TempArena = {0};
 static HWND WindowHandle;
 static bool ShouldWindowClose = false;
 static bool Reset = true;
+static bool NewSeed = true;
 static bool AdvanceByOne = false;
 static bool Paused = false;
+static bool UpdateColorCbuffer = false;
+static bool ModifyColors = true;
+static bool ColorsEnabled = false;
 static u32 WindowWidth = 1024, WindowHeight = 1024;
 static u32 TextureSize = 256;
 
@@ -235,6 +239,16 @@ typedef struct {
 } constant_buffer;
 
 typedef struct {
+    f32 x, y, z, w;
+} float4;
+
+typedef struct {
+    u32 Enabled;
+    u32 _Padding[3];
+    float4 Colors[STATE_COMBOS];
+} color_palette_cbuffer;
+
+typedef struct {
     u64 Seed;
 } u64_random_state;
 
@@ -433,6 +447,7 @@ void AppMain() {
     }
 
     ID3D11Buffer *ConstantBuffer = 0;
+    ID3D11Buffer *ColorPaletteCBuffer = 0;
     {
         D3D11_BUFFER_DESC BufferDescription = {
             .ByteWidth = sizeof(constant_buffer),
@@ -443,6 +458,18 @@ void AppMain() {
             .StructureByteStride = 0
         };
         HR = ID3D11Device_CreateBuffer(Device, &BufferDescription, NULL, &ConstantBuffer);
+        Assert(SUCCEEDED(HR));
+    }
+    {
+        D3D11_BUFFER_DESC BufferDescription = {
+            .ByteWidth = sizeof(color_palette_cbuffer),
+            .Usage = D3D11_USAGE_DYNAMIC,
+            .BindFlags = D3D11_BIND_CONSTANT_BUFFER,
+            .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
+            .MiscFlags = 0,
+            .StructureByteStride = 0
+        };
+        HR = ID3D11Device_CreateBuffer(Device, &BufferDescription, NULL, &ColorPaletteCBuffer);
         Assert(SUCCEEDED(HR));
     }
 
@@ -558,10 +585,14 @@ void AppMain() {
         }
 
         static constant_buffer Constants = {0};
+        static color_palette_cbuffer BlitColors = {0};
+
         Constants.Time = Time;
         Constants.TextureSize = TextureSize;
         if (Reset) {
             Constants.Row = 0 | (1U << 31U);
+        }
+        if (NewSeed) {
             Constants.RandomSeed = F32_Random(&RandomState);
             const float Lambda = 0.25f;
             u32 i = 0;
@@ -578,6 +609,7 @@ void AppMain() {
                 Constants.LookupTable[j] = Constants.LookupTable[RandomIndex];
                 Constants.LookupTable[RandomIndex].Value = Temp;
             }
+            NewSeed = false;
         }
         bool Advance = (!Paused) || (Paused && AdvanceByOne);
         if (Advance) {
@@ -586,6 +618,21 @@ void AppMain() {
                 Constants.Row = 0;
             }
             AdvanceByOne = false;
+        }
+
+        if (UpdateColorCbuffer) {
+            BlitColors.Enabled = (ColorsEnabled) ? 0xFFFFFFFF : 0x0;
+            if (ModifyColors) {
+                BlitColors.Colors[0] = (float4){0};
+                for (u32 i = 1; i < STATE_COMBOS; ++i) {
+                    BlitColors.Colors[i].x = F32_Random(&RandomState);
+                    BlitColors.Colors[i].y = F32_Random(&RandomState);
+                    BlitColors.Colors[i].z = F32_Random(&RandomState);
+                    BlitColors.Colors[i].w = 1.0f;
+                }
+                ModifyColors = false;
+            }
+            WriteToConstantBuffer(DeviceContext, ColorPaletteCBuffer, BufferFromStruct(BlitColors));
         }
 
         WriteToConstantBuffer(DeviceContext, ConstantBuffer, BufferFromStruct(Constants));
@@ -658,10 +705,11 @@ void AppMain() {
         ID3D11DeviceContext_PSSetSamplers(DeviceContext, 0, 1, &SamplerState);
         ID3D11DeviceContext_PSSetShaderResources(DeviceContext, 0, 1, &Texture.ResourceView);
         ID3D11DeviceContext_PSSetShader(DeviceContext, PixelShader, NULL, 0);
+        ID3D11DeviceContext_PSSetConstantBuffers(DeviceContext, 0, 1, &ColorPaletteCBuffer);
 
         ID3D11DeviceContext_Draw(DeviceContext, 6, 0);
 
-        IDXGISwapChain1_Present(SwapChain, 2, 0);
+        IDXGISwapChain1_Present(SwapChain, 1, 0);
         ID3D11DeviceContext_PSSetShaderResources(DeviceContext, 0, 1, (ID3D11ShaderResourceView**)NullSRV);
     }
 
@@ -723,9 +771,23 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_KEYUP: {
             if (wParam == 'R') {
                 Reset = true;
+                NewSeed = true;
+            }
+            if (wParam == VK_DOWN) {
+                Reset = true;
             }
             if (wParam == VK_SPACE) {
                 Paused = !Paused;
+            }
+            if (wParam == 'Q') {
+                if (ColorsEnabled) {
+                    ModifyColors = true;
+                    UpdateColorCbuffer = true;
+                }
+            }
+            if (wParam == 'W') {
+                ColorsEnabled = !ColorsEnabled;
+                UpdateColorCbuffer = true;
             }
             return 0;
         }
