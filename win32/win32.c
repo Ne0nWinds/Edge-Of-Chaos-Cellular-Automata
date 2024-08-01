@@ -551,7 +551,7 @@ void AppMain() {
         Constants.Time = Time;
         Constants.TextureSize = TextureSize;
         if (Reset) {
-            Constants.Row = 1;
+            Constants.Row = 0 | (1U << 31U);
             Constants.RandomSeed = F32_Random(&RandomState);
             const float Lambda = 0.25f;
             u32 i = 0;
@@ -569,6 +569,14 @@ void AppMain() {
                 Constants.LookupTable[RandomIndex].Value = Temp;
             }
         }
+        bool Advance = (!Paused) || (Paused && AdvanceByOne);
+        if (Advance) {
+            Constants.Row += 1;
+            if ((Constants.Row & 0x7FFFFFFF) == TextureSize) {
+                Constants.Row = 0;
+            }
+            AdvanceByOne = false;
+        }
 
         WriteToConstantBuffer(DeviceContext, ConstantBuffer, BufferFromStruct(Constants));
         if (Reset) {
@@ -580,16 +588,10 @@ void AppMain() {
             Reset = false;
         }
 
-        if ((!Paused && Constants.Row < TextureSize) || (Paused && AdvanceByOne)) {
+        if (Advance) {
             static compute_shader ResetCS = {0};
             GetComputeShader(Device, "advance.compute.cso", &ResetCS);
             DispatchKernel(DeviceContext, ResetCS, TextureSize / 128, 1, &Texture.UAV, 1, ConstantBuffer);
-            Constants.Row += 1;
-            AdvanceByOne = false;
-        }
-
-        if (Constants.Row == TextureSize && !Paused) {
-            Reset = true;
         }
 
         if (PreviousWindowWidth != WindowWidth || PreviousWindowHeight != WindowHeight) {
@@ -641,6 +643,7 @@ void AppMain() {
         ID3D11DeviceContext_RSSetState(DeviceContext, RasterizerState);
 
         ID3D11DeviceContext_VSSetShader(DeviceContext, VertexShader, NULL, 0);
+        ID3D11DeviceContext_VSSetConstantBuffers(DeviceContext, 0, 1, &ConstantBuffer);
 
         ID3D11DeviceContext_PSSetSamplers(DeviceContext, 0, 1, &SamplerState);
         ID3D11DeviceContext_PSSetShaderResources(DeviceContext, 0, 1, &Texture.ResourceView);
@@ -648,7 +651,7 @@ void AppMain() {
 
         ID3D11DeviceContext_Draw(DeviceContext, 6, 0);
 
-        IDXGISwapChain1_Present(SwapChain, 1, 0);
+        IDXGISwapChain1_Present(SwapChain, 2, 0);
         ID3D11DeviceContext_PSSetShaderResources(DeviceContext, 0, 1, (ID3D11ShaderResourceView**)NullSRV);
     }
 

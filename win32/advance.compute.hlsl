@@ -21,14 +21,16 @@ int AccessTexture(float x, float y) {
 void main(uint3 id : SV_DispatchThreadID) {
     const uint states = STATES;
     const int search_range = SEARCH_RANGE;
+    const uint row = Row & 0x7FFFFFFF;
+    const uint previous_row = (row != 0) ? row - 1 : TextureSize - 1;
 
     uint index = 0;
     int multiplier = STATE_COMBOS / states;
     for (int i = -search_range; i <= search_range; ++i) {
-        index += AccessTexture((int)id.x - i, Row - 1) * multiplier;
+        index += AccessTexture((int)id.x - i, previous_row) * multiplier;
         multiplier /= states;
     }
 
     float final_state = LookupTable[index];
-    texture1[float2(id.x, Row)] = final_state;
+    texture1[float2(id.x, row)] = final_state;
 }
