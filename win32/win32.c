@@ -43,7 +43,7 @@ bool MouseDown;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-memory_arena AllocateArenaFromOS(u32 Capacity, u64 StartingAddress) {
+static memory_arena AllocateArenaFromOS(u32 Capacity, u64 StartingAddress) {
     memory_arena Result = {0};
     Result.Capacity = Capacity;
     u32 SizeRoundedUp = RoundUp32(Capacity, AllocationGranularity);
@@ -136,12 +136,19 @@ static void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *C
     compute_shader Result = {0};
     memory_arena FileArena = ArenaScratch(&TempArena);
 
+#ifndef _DEBUG
+    if (ComputeShader->D3D11ComputeShaderHandle != 0) {
+        return;
+    }
+#endif
+
     HANDLE FileHandle = CreateFileA(Path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (FileHandle == INVALID_HANDLE_VALUE) {
         Assert(ComputeShader->D3D11ComputeShaderHandle != 0); // Invalid File Path
         return;
     }
 
+#ifdef _DEBUG
     FILETIME LastWriteTime = {0};
     GetFileTime(FileHandle, NULL, NULL, &LastWriteTime);
 
@@ -150,6 +157,7 @@ static void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *C
         return;
     }
     Result.FileTime = LastWriteTime;
+#endif
 
     buffer ByteCode;
     {
@@ -168,10 +176,12 @@ static void GetComputeShader(ID3D11Device *Device, char *Path, compute_shader *C
         };
     }
 
+#ifdef _DEBUG
     if (ComputeShader->D3D11ComputeShaderHandle != 0) {
         ID3D11ComputeShader_Release(ComputeShader->D3D11ComputeShaderHandle);
         OutputDebugStringA("Reloading Compute Shader!\n");
     }
+#endif
     ID3D11Device_CreateComputeShader(Device, ByteCode.Data, ByteCode.Size, NULL, &Result.D3D11ComputeShaderHandle);
     Assert(Result.D3D11ComputeShaderHandle != 0);
 
